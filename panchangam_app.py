@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, time, timedelta
 
-st.title("📅 Prasanna's Panchangam Lookup Tool for Portland, OR - Rev1 - 3/28/25")
+st.title("📅 Prasanna's Panchangam Lookup Tool for Portland, OR - Rev2 - 3/28/25")
 st.subheader("Select a date to find Tithis b/w sunrise & sunset and Nakshatra")
 
 # 📤 Load the CSV from GitHub
