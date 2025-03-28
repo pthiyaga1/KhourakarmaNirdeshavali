@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, time, timedelta
 
-st.title("📅 Prasanna's Panchangam Lookup Tool for Portland, OR - Rev2 - 3/28/25")
+st.title("📅 Prasanna's Panchangam Lookup Tool for Portland, OR - Rev1 - 3/28/25")
 st.subheader("Select a date to find Tithis b/w sunrise & sunset and Nakshatra")
 
 # 📤 Load the CSV from GitHub
@@ -62,4 +62,14 @@ if not day_data.empty:
     if not next_day_data.empty:
         next_day_tithi = extract_tithi_info(next_day_data.iloc[0])
         for name, t_time in next_day_tithi:
-            if
+            if t_time <= sunset:
+                tithis_between.append(name)
+
+    # Display
+    st.success(f"📆 Date: {selected_date.strftime('%B %d, %Y')}")
+    st.write(f"🌀 **Tithis b/w sunrise & sunset**: {', '.join(tithis_between) if tithis_between else 'N/A'}")
+
+    nakshatra = day_data.iloc[0].get('Nakshatra', 'N/A')
+    st.write(f"🌟 **Nakshatra**: {nakshatra}")
+else:
+    st.warning("This date is not available in the data. Try another one.")
