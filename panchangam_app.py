@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 
-st.title("✂️ Kshoura Karma Nirdeshavali - Rev04 - 03/29/25")
+st.title("✂️ Kshoura Karma Nirdeshavali - Rev05 - 03/29/25")
 st.subheader("📍 Portland OR")
 
 # 📤 Load the CSV from GitHub
