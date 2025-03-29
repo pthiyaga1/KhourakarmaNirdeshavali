@@ -2,8 +2,8 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 
-st.title("📅 Prasanna's Panchangam Lookup Tool for Portland, OR - Rev4")
-st.subheader("Select a date to find Tithis & Nakshatras b/w Sunrise & Sunset with timings")
+st.title("📅 Kshoura Karma Nirdeshavali - Rev4")
+st.subheader("Portand - OR - Rev4 ")
 
 # Load CSV from GitHub or local
 @st.cache_data
