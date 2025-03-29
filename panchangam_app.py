@@ -51,7 +51,7 @@ if not today_row.empty:
         except:
             return None
 
-       tithi_str = format_period(row['Tithi'], "Tithi", selected_date) or ""
+    tithi_str = format_period(row['Tithi'], "Tithi", selected_date) or ""
     if next_row is not None and next_row['Tithi']:
         next_tithi_name = next_row['Tithi'].split()[0]
         tithi_str += f", {next_tithi_name} after {sunset.strftime('%I:%M %p')}"
