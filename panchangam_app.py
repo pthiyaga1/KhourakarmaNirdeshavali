@@ -1,11 +1,14 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
+from PIL import Image
+
+st.set_page_config(page_title="Kshoura Karma Nirdeshavali", layout="centered")
 
 st.title("✂️ Kshoura Karma Nirdeshavali - Rev04 - 03/29/25")
 st.subheader("📍 Portland OR")
+st.write("Select a date to find Tithis & Nakshatras b/w Sunrise & Sunset with timings")
 
-# Load the CSV from GitHub
 @st.cache_data
 def load_data():
     url = "https://raw.githubusercontent.com/pthiyaga1/KshourakarmaNirdeshavali/main/Panchangam_April-June_2025_filled_full.csv"
@@ -15,61 +18,57 @@ def load_data():
 
 df = load_data()
 
-# Let user pick a date
 selected_date = st.date_input("Pick a date", min_value=df['Date'].min(), max_value=df['Date'].max())
 
-# Get row for selected and next day
+# Get today's and next day's rows
 today_row = df[df['Date'] == pd.to_datetime(selected_date)]
-next_day = selected_date + timedelta(days=1)
-next_day_row = df[df['Date'] == pd.to_datetime(next_day)]
+next_row = df[df['Date'] == pd.to_datetime(selected_date + timedelta(days=1))]
 
-if not today_row.empty:
-    row = today_row.iloc[0]
-    next_row = next_day_row.iloc[0] if not next_day_row.empty else None
+if today_row.empty or next_row.empty:
+    st.error("Data not available for selected date or next day.")
+else:
+    day_of_week = today_row.iloc[0]['Day']
+    st.success(f"📅 {day_of_week}, {selected_date.strftime('%B %d, %Y')}")
 
-    # Parse sunrise and sunset
-    sunrise = datetime.strptime(f"{selected_date} {row['Sunrise']}", "%Y-%m-%d %H:%M:%S")
-    sunset = datetime.strptime(f"{selected_date} {row['Sunset']}", "%Y-%m-%d %H:%M:%S")
+    # Get sunrise and sunset times
+    sunrise_str = today_row.iloc[0]['Sunrise']
+    sunset_str = today_row.iloc[0]['Sunset']
+    sunrise = datetime.strptime(sunrise_str, "%H:%M:%S").time()
+    sunset = datetime.strptime(sunset_str, "%H:%M:%S").time()
 
-    def format_period(event_str, label, row_date):
-        if pd.isna(event_str) or event_str.strip() == "":
+    # ============ TITHI ============ #
+    tithi1_info = today_row.iloc[0]['Tithi']
+    tithi2_info = next_row.iloc[0]['Tithi']  # In case tithi spans beyond sunset
+
+    tithi_parts = tithi1_info.split()
+    tithi1_name = tithi_parts[0]
+    tithi1_time = tithi_parts[1] if len(tithi_parts) > 1 else ""
+
+    def parse_time_with_24_support(time_str, base_date):
+        if ':' not in time_str:
             return None
         try:
-            name, time_str = event_str.split()
-            h, m, s = map(int, time_str.split(":"))
-            if h >= 24:
-                h -= 24
-                next_day_time = datetime.combine(row_date + timedelta(days=1), datetime.min.time()) + timedelta(hours=h, minutes=m, seconds=s)
-                return f"{name} till {next_day_time.strftime('%I:%M:%S %p on %m/%d/%Y')}"
+            hour, minute, second = map(int, time_str.split(":"))
+            if hour >= 24:
+                hour -= 24
+                return datetime.combine(base_date + timedelta(days=1), datetime.strptime(f"{hour}:{minute}:{second}", "%H:%M:%S").time())
             else:
-                end_time = datetime.combine(row_date, datetime.min.time()) + timedelta(hours=h, minutes=m, seconds=s)
-                if end_time < sunrise:
-                    return None
-                if end_time > sunset:
-                    return f"{name} from {sunrise.strftime('%I:%M %p')} to {sunset.strftime('%I:%M %p')}"
-                return f"{name} from {sunrise.strftime('%I:%M %p')} to {end_time.strftime('%I:%M %p')}"
+                return datetime.combine(base_date, datetime.strptime(time_str, "%H:%M:%S").time())
         except:
             return None
 
-    tithi_str = format_period(row['Tithi'], "Tithi", selected_date) or ""
-    if next_row is not None and next_row['Tithi']:
-        next_tithi_name = next_row['Tithi'].split()[0]
-        tithi_str += f", {next_tithi_name} after {sunset.strftime('%I:%M %p')}"
+    tithi1_end_dt = parse_time_with_24_support(tithi1_time, selected_date)
 
-    nakshatra_str = format_period(row['Nakshatra'], "Nakshatra", selected_date) or ""
-    if next_row is not None and next_row['Nakshatra']:
-        next_nakshatra_name = next_row['Nakshatra'].split()[0]
-        nakshatra_str += f", {next_nakshatra_name} after {sunset.strftime('%I:%M %p')}"
+    tithi_str = ""
+    if tithi1_end_dt:
+        tithi_str += f"{tithi1_name} from {sunrise.strftime('%I:%M %p')} to {tithi1_end_dt.strftime('%I:%M %p')}, "
+        tithi2_name = tithi2_info.split()[0]
+        tithi_str += f"{tithi2_name} from {tithi1_end_dt.strftime('%I:%M %p')} to {sunset.strftime('%I:%M %p')}"
+    else:
+        tithi_str = f"{tithi1_name} (full day)"
 
-    # Display day
-    st.success(f"📅 {selected_date.strftime('%A, %B %d, %Y')}")
+    st.markdown(f"🔷 **Tithis b/w Sunrise & Sunset**: {tithi_str}")
 
-    # Display info
-    st.markdown(f"🔷 **Tithis b/w Sunrise & Sunset:** {tithi_str if tithi_str else 'N/A'}")
-    st.markdown(f"🌟 **Nakshatras b/w Sunrise & Sunset:** {nakshatra_str if nakshatra_str else 'N/A'}")
-
-    # Show the image
-    st.image("image.png", use_container_width=True)
-
-else:
-    st.warning("Selected date not found in data.")
+    # ============ NAKSHATRA ============ #
+    nakshatra_info = today_row.iloc[0]['Nakshatra']
+    next_n_
