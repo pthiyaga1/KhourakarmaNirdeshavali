@@ -51,15 +51,15 @@ if not today_row.empty:
         except:
             return None
 
-    tithi_str = format_period(row['Tithi'], "Tithi", selected_date)
-    if next_row is not None:
+       tithi_str = format_period(row['Tithi'], "Tithi", selected_date) or ""
+    if next_row is not None and next_row['Tithi']:
         next_tithi_name = next_row['Tithi'].split()[0]
-        tithi_str = tithi_str + f", {next_tithi_name} after {sunset.strftime('%I:%M %p')}"
+        tithi_str += f", {next_tithi_name} after {sunset.strftime('%I:%M %p')}"
 
-    nakshatra_str = format_period(row['Nakshatra'], "Nakshatra", selected_date)
-    if next_row is not None:
+    nakshatra_str = format_period(row['Nakshatra'], "Nakshatra", selected_date) or ""
+    if next_row is not None and next_row['Nakshatra']:
         next_nakshatra_name = next_row['Nakshatra'].split()[0]
-        nakshatra_str = nakshatra_str + f", {next_nakshatra_name} after {sunset.strftime('%I:%M %p')}"
+        nakshatra_str += f", {next_nakshatra_name} after {sunset.strftime('%I:%M %p')}"
 
     # Display day
     st.success(f"📅 {selected_date.strftime('%A, %B %d, %Y')}")
