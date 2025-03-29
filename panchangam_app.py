@@ -2,10 +2,9 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 
-st.title("✂️ Kshoura Karma Nirdeshavali - Rev05 - 03/29/25")
-st.subheader("📍 Portland OR")
-
-# 📤 Load the CSV from GitHub
+# -------------------------
+# Load Data
+# -------------------------
 @st.cache_data
 
 def load_data():
@@ -16,10 +15,75 @@ def load_data():
 
 df = load_data()
 
-# 📅 Let user pick a date
-selected_date = st.date_input("Pick a date", min_value=df['Date'].min(), max_value=df['Date'].max())
+# -------------------------
+# Janma Nakshatra Input
+# -------------------------
+nakshatras = [
+    "Ashvini", "Bharani", "Krittika", "Rohini", "Mrigashirsha", "Aardra", "Punarvasu", "Pushya", "Aslesha",
+    "Magha", "P. Phalguni or Purva", "U. Phalguni or Uttara", "Hasta", "Chitra", "Svaati", "Vishaakha",
+    "Anuraadha", "Jyeshtha", "Mula", "P.shadha", "U.shada", "Shravana", "Dhanishta", "Shatabhisha",
+    "P. Bhadrapada", "U. Bhadrapada", "Revati"
+]
 
-# Get row for selected date and next date
+st.title("💇 Kshoura Karma Nirdeshavali - Rev05")
+st.subheader("📍 Portland OR")
+
+user_nakshatra = st.selectbox("Select your Janma Nakshatra", nakshatras)
+current_time = datetime.now()
+st.markdown(f"**Current timestamp:** {current_time.strftime('%A, %B %d, %Y %I:%M %p')}")
+
+# -------------------------
+# Rule Filters
+# -------------------------
+def is_haircut_allowed(row, user_nakshatra):
+    disallowed_tithis = ["Prathama", "Chaturthi", "Shashti", "Navami", "Chaturdashi", "Poornima", "Amavasya"]
+    disallowed_yogas = ["Vyatheetapam", "Vaidhriti"]
+    allowed_nakshatras = ["Ashwini", "Mrigasheerham", "Punarvasu", "Pushyam", "Hastam", "Chitra", "Swati", "Jyeshta", "Shravana", "Dhanishta", "Shatabhishak", "Revati"]
+
+    day = row['Day']
+    if day in ["Sunday", "Tuesday", "Saturday"]:
+        return False
+
+    tithi = str(row['Tithi']).split(' ')[0] if pd.notna(row['Tithi']) else ""
+    if tithi in disallowed_tithis:
+        return False
+
+    yoga = str(row['Yogam']).split(' ')[0] if pd.notna(row['Yogam']) else ""
+    if any(y in yoga for y in disallowed_yogas):
+        return False
+
+    nakshatra = str(row['Nakshatra']).split(' ')[0] if pd.notna(row['Nakshatra']) else ""
+    if user_nakshatra.split()[0] in nakshatra:  # Janma Nakshatra check
+        return False
+    if nakshatra not in allowed_nakshatras:
+        return False
+
+    return True
+
+# -------------------------
+# Suggest Haircut Dates
+# -------------------------
+st.markdown("---")
+st.markdown("### 💇 Next 2 Allowed Haircut Days")
+suggestions = []
+for idx, row in df.iterrows():
+    if row['Date'] > current_time and is_haircut_allowed(row, user_nakshatra):
+        suggestions.append(row)
+    if len(suggestions) == 2:
+        break
+
+if suggestions:
+    for s in suggestions:
+        st.success(f"{s['Day']}, {s['Date'].strftime('%B %d, %Y')} — Tithi: {s['Tithi']}, Nakshatra: {s['Nakshatra']}, Yogam: {s['Yogam']}")
+else:
+    st.warning("No allowed haircut dates found in this dataset.")
+
+# -------------------------
+# Pick a Date - Legacy Functionality
+# -------------------------
+st.markdown("---")
+st.markdown("### 🌄 Panchangam Lookup for a Selected Date")
+selected_date = st.date_input("Pick a date", min_value=df['Date'].min(), max_value=df['Date'].max())
 today_row = df[df['Date'] == pd.to_datetime(selected_date)]
 next_day_row = df[df['Date'] == pd.to_datetime(selected_date) + timedelta(days=1)]
 
@@ -27,77 +91,45 @@ if not today_row.empty and not next_day_row.empty:
     day = today_row.iloc[0]['Day']
     sunrise = datetime.strptime(today_row.iloc[0]['Sunrise'], "%H:%M:%S")
     sunset = datetime.strptime(today_row.iloc[0]['Sunset'], "%H:%M:%S")
+    st.success(f"🗓️ {day}, {selected_date.strftime('%B %d, %Y')}")
 
-    st.success(f"📅 {day}, {selected_date.strftime('%B %d, %Y')}")
-
-    # === TITHI ===
-    tithi_data = today_row.iloc[0]['Tithi']
-    next_tithi = next_day_row.iloc[0]['Tithi']
-    if pd.notna(tithi_data) and ' ' in tithi_data:
-        tithi_name, tithi_time = tithi_data.split(' ')
-        tithi_dt = datetime.strptime(tithi_time, "%H:%M:%S")
-        if tithi_dt.hour >= 24:
-            tithi_dt = tithi_dt - timedelta(hours=24)
-            tithi_dt += timedelta(days=1)
-        if tithi_dt > sunset:
-            tithi_str = f"{tithi_name} from {sunrise.strftime('%I:%M %p')} to {sunset.strftime('%I:%M %p')}"
-        elif tithi_dt <= sunrise:
-            tithi_str = f"{next_tithi} from {sunrise.strftime('%I:%M %p')} to {sunset.strftime('%I:%M %p')}"
+    def parse_transition(data_today, data_next, sunrise, sunset, label):
+        transition_str = ""
+        if pd.notna(data_today) and ' ' in data_today:
+            name, time = data_today.split(' ')
+            dt = datetime.strptime(time, "%H:%M:%S")
+            if dt.hour >= 24:
+                dt -= timedelta(hours=24)
+                dt += timedelta(days=1)
+                transition_str = f"{name} till {dt.strftime('%I:%M:%S %p')} on {(selected_date + timedelta(days=1)).strftime('%m/%d/%Y')}"
+            elif dt <= sunrise:
+                transition_str = f"{data_next} after {sunrise.strftime('%I:%M %p')}"
+            elif dt > sunset:
+                transition_str = f"{name} from {sunrise.strftime('%I:%M %p')} to {sunset.strftime('%I:%M %p')}"
+            else:
+                transition_str = f"{name} from {sunrise.strftime('%I:%M %p')} to {dt.strftime('%I:%M %p')}, {data_next} after {dt.strftime('%I:%M %p')}"
+        elif pd.notna(data_today):
+            transition_str = data_today
         else:
-            tithi_str = f"{tithi_name} from {sunrise.strftime('%I:%M %p')} to {tithi_dt.strftime('%I:%M %p')}, {next_tithi} from {tithi_dt.strftime('%I:%M %p')} to {sunset.strftime('%I:%M %p')}"
-    else:
-        tithi_str = "N/A"
-    st.markdown(f"<b style='color:#0066cc'>🔷 Tithis b/w Sunrise & Sunset:</b> {tithi_str}", unsafe_allow_html=True)
+            transition_str = "N/A"
 
-    # === NAKSHATRA ===
-    nakshatra_data = today_row.iloc[0]['Nakshatra']
-    next_nakshatra = next_day_row.iloc[0]['Nakshatra']
-    nakshatra_str = ""
-    if pd.notna(nakshatra_data):
-        if "full night" in nakshatra_data:
-            nakshatra_str = f"{nakshatra_data}"
-        elif ' ' in nakshatra_data:
-            nakshatra_name, nakshatra_time = nakshatra_data.split(' ')
-            nakshatra_dt = datetime.strptime(nakshatra_time, "%H:%M:%S")
-            if nakshatra_dt.hour >= 24:
-                next_day = pd.to_datetime(selected_date) + timedelta(days=1)
-                nakshatra_dt = nakshatra_dt - timedelta(hours=24)
-                nakshatra_str = f"{nakshatra_name} till {nakshatra_dt.strftime('%I:%M:%S %p')} on {next_day.strftime('%m/%d/%Y')}"
-            elif nakshatra_dt <= sunrise:
-                nakshatra_str = f"{next_nakshatra} after {sunrise.strftime('%I:%M %p')}"
-            elif nakshatra_dt > sunset:
-                nakshatra_str = f"{nakshatra_name} from {sunrise.strftime('%I:%M %p')} to {sunset.strftime('%I:%M %p')}"
-            else:
-                nakshatra_str = f"{nakshatra_name} from {sunrise.strftime('%I:%M %p')} to {nakshatra_dt.strftime('%I:%M %p')}, {next_nakshatra} after {nakshatra_dt.strftime('%I:%M %p')}"
-    else:
-        nakshatra_str = "N/A"
-    st.markdown(f"<b style='color:#ffaa00'>🌟 Nakshatras b/w Sunrise & Sunset:</b> {nakshatra_str}", unsafe_allow_html=True)
+        icon_map = {
+            'Tithi': '🔹',
+            'Nakshatra': '🌟',
+            'Yogam': '🧘'
+        }
+        color_map = {
+            'Tithi': '#0066cc',
+            'Nakshatra': '#ffaa00',
+            'Yogam': '#228B22'
+        }
+        st.markdown(f"<b style='color:{color_map[label]}'> {icon_map[label]} {label}s b/w Sunrise & Sunset:</b> {transition_str}", unsafe_allow_html=True)
 
-    # === YOGAM ===
-    yogam_data = today_row.iloc[0]['Yogam']
-    next_yogam = next_day_row.iloc[0]['Yogam']
-    yogam_str = ""
-    if pd.notna(yogam_data):
-        if "full night" in yogam_data:
-            yogam_str = f"{yogam_data}"
-        elif ' ' in yogam_data:
-            yogam_name, yogam_time = yogam_data.split(' ')
-            yogam_dt = datetime.strptime(yogam_time, "%H:%M:%S")
-            if yogam_dt.hour >= 24:
-                next_day = pd.to_datetime(selected_date) + timedelta(days=1)
-                yogam_dt = yogam_dt - timedelta(hours=24)
-                yogam_str = f"{yogam_name} till {yogam_dt.strftime('%I:%M:%S %p')} on {next_day.strftime('%m/%d/%Y')}"
-            elif yogam_dt <= sunrise:
-                yogam_str = f"{next_yogam} after {sunrise.strftime('%I:%M %p')}"
-            elif yogam_dt > sunset:
-                yogam_str = f"{yogam_name} from {sunrise.strftime('%I:%M %p')} to {sunset.strftime('%I:%M %p')}"
-            else:
-                yogam_str = f"{yogam_name} from {sunrise.strftime('%I:%M %p')} to {yogam_dt.strftime('%I:%M %p')}, {next_yogam} after {yogam_dt.strftime('%I:%M %p')}"
-    else:
-        yogam_str = "N/A"
-    st.markdown(f"<b style='color:#228B22'>🧘 Yogam b/w Sunrise & Sunset:</b> {yogam_str}", unsafe_allow_html=True)
+    parse_transition(today_row.iloc[0]['Tithi'], next_day_row.iloc[0]['Tithi'], sunrise, sunset, 'Tithi')
+    parse_transition(today_row.iloc[0]['Nakshatra'], next_day_row.iloc[0]['Nakshatra'], sunrise, sunset, 'Nakshatra')
+    parse_transition(today_row.iloc[0]['Yogam'], next_day_row.iloc[0]['Yogam'], sunrise, sunset, 'Yogam')
 
-    # Show guidance image
-    st.image("https://raw.githubusercontent.com/pthiyaga1/KshourakarmaNirdeshavali/main/image.png", use_container_width=True)
-else:
-    st.warning("Date not available in the data. Please try another one.")
+# -------------------------
+# Reference Image
+# -------------------------
+st.image("https://raw.githubusercontent.com/pthiyaga1/KshourakarmaNirdeshavali/main/image.png", use_container_width=True)
