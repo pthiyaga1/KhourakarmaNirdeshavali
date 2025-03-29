@@ -71,4 +71,28 @@ else:
 
     # ============ NAKSHATRA ============ #
     nakshatra_info = today_row.iloc[0]['Nakshatra']
-    next_n_
+    next_nakshatra_info = next_row.iloc[0]['Nakshatra']
+
+    nk_parts = nakshatra_info.split()
+    nk_name = nk_parts[0]
+    nk_time = nk_parts[1] if len(nk_parts) > 1 else ""
+
+    nk_end_dt = parse_time_with_24_support(nk_time, selected_date)
+
+    nk_str = ""
+    if nk_end_dt:
+        if nk_end_dt.time() <= sunrise:
+            nk_str = f"{nk_name} ends before sunrise"
+        elif nk_end_dt.time() >= sunset:
+            nk_str = f"{nk_name} till {nk_end_dt.strftime('%I:%M %p')} on {(selected_date + timedelta(days=1)).strftime('%m/%d/%Y')}"
+        else:
+            next_nk_name = next_nakshatra_info.split()[0]
+            nk_str = f"{nk_name} from {sunrise.strftime('%I:%M %p')} to {nk_end_dt.strftime('%I:%M %p')}, {next_nk_name} after {nk_end_dt.strftime('%I:%M %p')}"
+    else:
+        nk_str = f"{nk_name} (full day)"
+
+    st.markdown(f"🌟 **Nakshatras b/w Sunrise & Sunset**: {nk_str}")
+
+    # ============ IMAGE ============ #
+    image = Image.open("image.png")  # Or download from URL if not local
+    st.image(image, caption="Kshoura Karma Rules", use_container_width=True)
