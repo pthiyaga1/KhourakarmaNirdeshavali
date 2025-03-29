@@ -25,7 +25,7 @@ nakshatras = [
     "P. Bhadrapada", "U. Bhadrapada", "Revati"
 ]
 
-st.title("💇 Kshoura Karma Nirdeshavali - Rev05")
+st.title("💇 Kshoura Karma Nirdeshavali - Rev06")
 st.subheader("📍 Portland OR")
 
 user_nakshatra = st.selectbox("Select your Janma Nakshatra", nakshatras)
