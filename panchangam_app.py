@@ -1,58 +1,81 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, time
+from datetime import datetime, timedelta
 
-st.title("🗕️ Prasanna's Panchangam Lookup Tool for Portland, OR - Rev1 - 3/28/25")
-st.subheader("Select a date to find Tithis b/w sunrise & sunset and Nakshatra")
+st.title("📅 Prasanna's Panchangam Lookup Tool for Portland, OR - Rev2 - 3/28/25")
+st.subheader("Select a date to find Tithis & Nakshatras between sunrise & sunset")
 
-# 📄 Load the CSV
+# 📤 Load the CSV from GitHub or local
 @st.cache_data
 def load_data():
     url = "https://raw.githubusercontent.com/pthiyaga1/KhourakarmaNirdeshavali/main/Panchangam_April-June_2025_filled_full.csv"
     df = pd.read_csv(url)
-    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
     return df
 
 df = load_data()
+df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
 
-# 🗓️ Let user pick a date
+# 📅 Date input
 selected_date = st.date_input("Pick a date", min_value=df['Date'].min(), max_value=df['Date'].max())
+result = df[df['Date'] == pd.to_datetime(selected_date)]
 
-# 🔍 Search for current and next day rows
-current_day = df[df['Date'] == pd.to_datetime(selected_date)]
-next_day = df[df['Date'] == pd.to_datetime(selected_date) + pd.Timedelta(days=1)]
+# 🧾 Show Panchangam
+if not result.empty:
+    sunrise_str = result.iloc[0].get("Sunrise", "06:00:00")
+    sunset_str = result.iloc[0].get("Sunset", "18:00:00")
 
-if not current_day.empty:
-    row = current_day.iloc[0]
-    sunrise = datetime.strptime(row['Sunrise'], '%H:%M:%S').time()
-    sunset = datetime.strptime(row['Sunset'], '%H:%M:%S').time()
+    # Convert times to datetime objects
+    sunrise = datetime.combine(selected_date, datetime.strptime(sunrise_str.strip(), "%H:%M:%S").time())
+    sunset = datetime.combine(selected_date, datetime.strptime(sunset_str.strip(), "%H:%M:%S").time())
 
-    # Extract tithi and time
-    tithi_entry = row['Tithi']
-    try:
-        tithi_name, tithi_time_str = tithi_entry.split()
-        tithi_time = datetime.strptime(tithi_time_str.replace('+', ''), '%H:%M:%S').time()
-    except:
-        tithi_name = tithi_entry
-        tithi_time = None
+    # --- Handle Tithi ---
+    tithi_info = result.iloc[0].get("Tithi", "N/A")
+    tithi_split = tithi_info.split(" ")
+    tithi_name = " ".join(tithi_split[:-1])
+    tithi_time_str = tithi_split[-1] if len(tithi_split) > 1 else None
 
-    # Get next day's tithi if available
-    tithi_next = None
-    if not next_day.empty:
-        tithi_next_entry = next_day.iloc[0]['Tithi']
-        tithi_next = tithi_next_entry.split()[0] if isinstance(tithi_next_entry, str) else None
+    tithi_output = "N/A"
+    if tithi_time_str:
+        try:
+            tithi_time = datetime.combine(selected_date, datetime.strptime(tithi_time_str, "%H:%M:%S").time())
+            if sunrise <= tithi_time <= sunset:
+                # Get next day's Tithi
+                next_day = pd.to_datetime(selected_date) + timedelta(days=1)
+                next_row = df[df['Date'] == next_day]
+                if not next_row.empty:
+                    tithi_output = f"{tithi_name} & {next_row.iloc[0]['Tithi']}"
+                else:
+                    tithi_output = f"{tithi_name}"
+            else:
+                tithi_output = tithi_name
+        except:
+            tithi_output = tithi_name
 
-    # 📅 Display
-    st.success(f"🗓️ Date: {selected_date.strftime('%B %d, %Y')}")
+    # --- Handle Nakshatra ---
+    nakshatra_info = result.iloc[0].get("Nakshatra", "N/A")
+    nakshatra_split = nakshatra_info.split(" ")
+    nakshatra_name = " ".join(nakshatra_split[:-1])
+    nakshatra_time_str = nakshatra_split[-1] if len(nakshatra_split) > 1 else None
 
-    if tithi_time and sunrise <= tithi_time <= sunset:
-        tithis_today = f"{tithi_name}, {tithi_next}" if tithi_next else tithi_name
-    else:
-        tithis_today = f"{tithi_name}"
+    nakshatra_output = "N/A"
+    if nakshatra_time_str:
+        try:
+            nakshatra_time = datetime.combine(selected_date, datetime.strptime(nakshatra_time_str, "%H:%M:%S").time())
+            if sunrise <= nakshatra_time <= sunset:
+                next_day = pd.to_datetime(selected_date) + timedelta(days=1)
+                next_row = df[df['Date'] == next_day]
+                if not next_row.empty:
+                    nakshatra_output = f"{nakshatra_name} & {next_row.iloc[0]['Nakshatra']}"
+                else:
+                    nakshatra_output = f"{nakshatra_name}"
+            else:
+                nakshatra_output = nakshatra_name
+        except:
+            nakshatra_output = nakshatra_name
 
-    st.write(f"🔀 **Tithis b/w sunrise & sunset**: {tithis_today}")
-
-    nakshatra = row.get('Nakshatra', 'N/A')
-    st.write(f"🌟 **Nakshatra**: {nakshatra}")
+    # ✅ Display
+    st.success(f"📆 Date: {selected_date.strftime('%B %d, %Y')}")
+    st.write(f"🌀 **Tithis b/w sunrise & sunset**: {tithi_output}")
+    st.write(f"🌟 **Nakshatras b/w sunrise & sunset**: {nakshatra_output}")
 else:
     st.warning("This date is not available in the data. Try another one.")
