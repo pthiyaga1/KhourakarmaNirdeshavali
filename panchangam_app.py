@@ -6,7 +6,7 @@ from PIL import Image
 st.set_page_config(page_title="Kshoura Karma Nirdeshavali", layout="centered")
 
 st.title("✂️ Kshoura Karma Nirdeshavali - Rev04 - 03/29/25")
-st.subheader("📍 Portland OR")
+st.subheader("📍 for Portland OR (Ack: ##Veda Ghosham## ")
 st.write("Select a date to find Tithis & Nakshatras b/w Sunrise & Sunset with timings")
 
 @st.cache_data
