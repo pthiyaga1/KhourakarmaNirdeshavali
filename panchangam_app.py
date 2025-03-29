@@ -1,15 +1,13 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-from PIL import Image
-
-st.set_page_config(page_title="Kshoura Karma Nirdeshavali", layout="centered")
 
 st.title("✂️ Kshoura Karma Nirdeshavali - Rev04 - 03/29/25")
-st.subheader("📍 for Portland OR (Ack: ##Veda Ghosham## ")
-st.write("Select a date to find Tithis & Nakshatras b/w Sunrise & Sunset with timings")
+st.subheader("📍 Portland OR")
 
+# 📤 Load the CSV from GitHub
 @st.cache_data
+
 def load_data():
     url = "https://raw.githubusercontent.com/pthiyaga1/KshourakarmaNirdeshavali/main/Panchangam_April-June_2025_filled_full.csv"
     df = pd.read_csv(url)
@@ -18,81 +16,88 @@ def load_data():
 
 df = load_data()
 
+# 📅 Let user pick a date
 selected_date = st.date_input("Pick a date", min_value=df['Date'].min(), max_value=df['Date'].max())
 
-# Get today's and next day's rows
+# Get row for selected date and next date
 today_row = df[df['Date'] == pd.to_datetime(selected_date)]
-next_row = df[df['Date'] == pd.to_datetime(selected_date + timedelta(days=1))]
+next_day_row = df[df['Date'] == pd.to_datetime(selected_date) + timedelta(days=1)]
 
-if today_row.empty or next_row.empty:
-    st.error("Data not available for selected date or next day.")
-else:
-    day_of_week = today_row.iloc[0]['Day']
-    st.success(f"📅 {day_of_week}, {selected_date.strftime('%B %d, %Y')}")
+if not today_row.empty and not next_day_row.empty:
+    day = today_row.iloc[0]['Day']
+    sunrise = datetime.strptime(today_row.iloc[0]['Sunrise'], "%H:%M:%S")
+    sunset = datetime.strptime(today_row.iloc[0]['Sunset'], "%H:%M:%S")
 
-    # Get sunrise and sunset times
-    sunrise_str = today_row.iloc[0]['Sunrise']
-    sunset_str = today_row.iloc[0]['Sunset']
-    sunrise = datetime.strptime(sunrise_str, "%H:%M:%S").time()
-    sunset = datetime.strptime(sunset_str, "%H:%M:%S").time()
+    st.success(f"📅 {day}, {selected_date.strftime('%B %d, %Y')}")
 
-    # ============ TITHI ============ #
-    tithi1_info = today_row.iloc[0]['Tithi']
-    tithi2_info = next_row.iloc[0]['Tithi']  # In case tithi spans beyond sunset
-
-    tithi_parts = tithi1_info.split()
-    tithi1_name = tithi_parts[0]
-    tithi1_time = tithi_parts[1] if len(tithi_parts) > 1 else ""
-
-    def parse_time_with_24_support(time_str, base_date):
-        if ':' not in time_str:
-            return None
-        try:
-            hour, minute, second = map(int, time_str.split(":"))
-            if hour >= 24:
-                hour -= 24
-                return datetime.combine(base_date + timedelta(days=1), datetime.strptime(f"{hour}:{minute}:{second}", "%H:%M:%S").time())
-            else:
-                return datetime.combine(base_date, datetime.strptime(time_str, "%H:%M:%S").time())
-        except:
-            return None
-
-    tithi1_end_dt = parse_time_with_24_support(tithi1_time, selected_date)
-
-    tithi_str = ""
-    if tithi1_end_dt:
-        tithi_str += f"{tithi1_name} from {sunrise.strftime('%I:%M %p')} to {tithi1_end_dt.strftime('%I:%M %p')}, "
-        tithi2_name = tithi2_info.split()[0]
-        tithi_str += f"{tithi2_name} from {tithi1_end_dt.strftime('%I:%M %p')} to {sunset.strftime('%I:%M %p')}"
-    else:
-        tithi_str = f"{tithi1_name} (full day)"
-
-    st.markdown(f"🔷 **Tithis b/w Sunrise & Sunset**: {tithi_str}")
-
-    # ============ NAKSHATRA ============ #
-    nakshatra_info = today_row.iloc[0]['Nakshatra']
-    next_nakshatra_info = next_row.iloc[0]['Nakshatra']
-
-    nk_parts = nakshatra_info.split()
-    nk_name = nk_parts[0]
-    nk_time = nk_parts[1] if len(nk_parts) > 1 else ""
-
-    nk_end_dt = parse_time_with_24_support(nk_time, selected_date)
-
-    nk_str = ""
-    if nk_end_dt:
-        if nk_end_dt.time() <= sunrise:
-            nk_str = f"{nk_name} ends before sunrise"
-        elif nk_end_dt.time() >= sunset:
-            nk_str = f"{nk_name} till {nk_end_dt.strftime('%I:%M %p')} on {(selected_date + timedelta(days=1)).strftime('%m/%d/%Y')}"
+    # === TITHI ===
+    tithi_data = today_row.iloc[0]['Tithi']
+    next_tithi = next_day_row.iloc[0]['Tithi']
+    if pd.notna(tithi_data) and ' ' in tithi_data:
+        tithi_name, tithi_time = tithi_data.split(' ')
+        tithi_dt = datetime.strptime(tithi_time, "%H:%M:%S")
+        if tithi_dt.hour >= 24:
+            tithi_dt = tithi_dt - timedelta(hours=24)
+            tithi_dt += timedelta(days=1)
+        if tithi_dt > sunset:
+            tithi_str = f"{tithi_name} from {sunrise.strftime('%I:%M %p')} to {sunset.strftime('%I:%M %p')}"
+        elif tithi_dt <= sunrise:
+            tithi_str = f"{next_tithi} from {sunrise.strftime('%I:%M %p')} to {sunset.strftime('%I:%M %p')}"
         else:
-            next_nk_name = next_nakshatra_info.split()[0]
-            nk_str = f"{nk_name} from {sunrise.strftime('%I:%M %p')} to {nk_end_dt.strftime('%I:%M %p')}, {next_nk_name} after {nk_end_dt.strftime('%I:%M %p')}"
+            tithi_str = f"{tithi_name} from {sunrise.strftime('%I:%M %p')} to {tithi_dt.strftime('%I:%M %p')}, {next_tithi} from {tithi_dt.strftime('%I:%M %p')} to {sunset.strftime('%I:%M %p')}"
     else:
-        nk_str = f"{nk_name} (full day)"
+        tithi_str = "N/A"
+    st.markdown(f"<b style='color:#0066cc'>🔷 Tithis b/w Sunrise & Sunset:</b> {tithi_str}", unsafe_allow_html=True)
 
-    st.markdown(f"🌟 **Nakshatras b/w Sunrise & Sunset**: {nk_str}")
+    # === NAKSHATRA ===
+    nakshatra_data = today_row.iloc[0]['Nakshatra']
+    next_nakshatra = next_day_row.iloc[0]['Nakshatra']
+    nakshatra_str = ""
+    if pd.notna(nakshatra_data):
+        if "full night" in nakshatra_data:
+            nakshatra_str = f"{nakshatra_data}"
+        elif ' ' in nakshatra_data:
+            nakshatra_name, nakshatra_time = nakshatra_data.split(' ')
+            nakshatra_dt = datetime.strptime(nakshatra_time, "%H:%M:%S")
+            if nakshatra_dt.hour >= 24:
+                next_day = pd.to_datetime(selected_date) + timedelta(days=1)
+                nakshatra_dt = nakshatra_dt - timedelta(hours=24)
+                nakshatra_str = f"{nakshatra_name} till {nakshatra_dt.strftime('%I:%M:%S %p')} on {next_day.strftime('%m/%d/%Y')}"
+            elif nakshatra_dt <= sunrise:
+                nakshatra_str = f"{next_nakshatra} after {sunrise.strftime('%I:%M %p')}"
+            elif nakshatra_dt > sunset:
+                nakshatra_str = f"{nakshatra_name} from {sunrise.strftime('%I:%M %p')} to {sunset.strftime('%I:%M %p')}"
+            else:
+                nakshatra_str = f"{nakshatra_name} from {sunrise.strftime('%I:%M %p')} to {nakshatra_dt.strftime('%I:%M %p')}, {next_nakshatra} after {nakshatra_dt.strftime('%I:%M %p')}"
+    else:
+        nakshatra_str = "N/A"
+    st.markdown(f"<b style='color:#ffaa00'>🌟 Nakshatras b/w Sunrise & Sunset:</b> {nakshatra_str}", unsafe_allow_html=True)
 
-    # ============ IMAGE ============ #
-    image = Image.open("image.png")  # Or download from URL if not local
-    st.image(image, caption="Kshoura Karma Rules", use_container_width=True)
+    # === YOGAM ===
+    yogam_data = today_row.iloc[0]['Yogam']
+    next_yogam = next_day_row.iloc[0]['Yogam']
+    yogam_str = ""
+    if pd.notna(yogam_data):
+        if "full night" in yogam_data:
+            yogam_str = f"{yogam_data}"
+        elif ' ' in yogam_data:
+            yogam_name, yogam_time = yogam_data.split(' ')
+            yogam_dt = datetime.strptime(yogam_time, "%H:%M:%S")
+            if yogam_dt.hour >= 24:
+                next_day = pd.to_datetime(selected_date) + timedelta(days=1)
+                yogam_dt = yogam_dt - timedelta(hours=24)
+                yogam_str = f"{yogam_name} till {yogam_dt.strftime('%I:%M:%S %p')} on {next_day.strftime('%m/%d/%Y')}"
+            elif yogam_dt <= sunrise:
+                yogam_str = f"{next_yogam} after {sunrise.strftime('%I:%M %p')}"
+            elif yogam_dt > sunset:
+                yogam_str = f"{yogam_name} from {sunrise.strftime('%I:%M %p')} to {sunset.strftime('%I:%M %p')}"
+            else:
+                yogam_str = f"{yogam_name} from {sunrise.strftime('%I:%M %p')} to {yogam_dt.strftime('%I:%M %p')}, {next_yogam} after {yogam_dt.strftime('%I:%M %p')}"
+    else:
+        yogam_str = "N/A"
+    st.markdown(f"<b style='color:#228B22'>🧘 Yogam b/w Sunrise & Sunset:</b> {yogam_str}", unsafe_allow_html=True)
+
+    # Show guidance image
+    st.image("https://raw.githubusercontent.com/pthiyaga1/KshourakarmaNirdeshavali/main/image.png", use_container_width=True)
+else:
+    st.warning("Date not available in the data. Please try another one.")
