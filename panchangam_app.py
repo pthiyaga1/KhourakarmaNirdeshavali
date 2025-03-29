@@ -97,7 +97,11 @@ if not today_row.empty and not next_day_row.empty:
         transition_str = ""
         if pd.notna(data_today) and ' ' in data_today:
             name, time = data_today.split(' ')
-            dt = datetime.strptime(time, "%H:%M:%S")
+           try:
+            time_cleaned = time.replace("+", "").strip()
+            dt = datetime.strptime(time_cleaned, "%H:%M:%S")
+           except ValueError:
+            return None, None  # Or handle more gracefully
             if dt.hour >= 24:
                 dt -= timedelta(hours=24)
                 dt += timedelta(days=1)
