@@ -42,7 +42,7 @@ def parse_transition(row, col_name, sunrise, sunset, next_day_str, next_row):
 
 # --- Streamlit App ---
 st.set_page_config(page_title="Kshoura Karma Panchangam Tool", layout="centered")
-st.title("✂️ Kshoura Karma Nirdeshavali - Haircut Date Checker - Rev08")
+st.title("✂️ Kshoura Karma Nirdeshavali - Haircut Date Checker")
 
 # Load Data
 @st.cache_data
@@ -77,7 +77,7 @@ if not check_row.empty and not next_row.empty:
     next_day_str = (pd.to_datetime(selected_date) + timedelta(days=1)).strftime('%m/%d/%Y')
 
     st.markdown(f"### 🗓️ Panchangam Lookup for Selected Date")
-    st.success(f"📅 {day}, {selected_date.strftime('%B %d, %Y')}")
+    st.success(f"🗕️ {day}, {selected_date.strftime('%B %d, %Y')}")
 
     t = parse_transition(check_row, 'Tithi', sunrise, sunset, next_day_str, next_r)
     n = parse_transition(check_row, 'Nakshatra', sunrise, sunset, next_day_str, next_r)
@@ -109,7 +109,7 @@ if not check_row.empty and not next_row.empty:
             st.markdown(f"- {issue}")
 
     # Suggest 2 future good dates
-    st.markdown("### 📆 Next Good Haircut Dates")
+    st.markdown("### 🗖️ Next Good Haircut Dates")
     future_dates = df[df['Date'] > pd.to_datetime(selected_date)].copy()
     future_dates = future_dates.reset_index(drop=True)
 
