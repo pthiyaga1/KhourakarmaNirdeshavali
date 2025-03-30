@@ -9,12 +9,12 @@ def parse_transition(row, col_name, sunrise, sunset, next_day_str, next_row):
     if pd.isna(value):
         return ["N/A"]
 
-    if 'full night' in value:
-        results.append(f"{value}")
-    elif '+' in value:
-        name, time = value.split(' ')
-        time = time.replace('+', '')  # remove plus sign
-        try:
+    try:
+        if 'full night' in value:
+            results.append(f"{value}")
+        elif '+' in value:
+            name, time = value.split(' ')
+            time = time.replace('+', '')
             hours, minutes, seconds = map(int, time.split(':'))
             if hours >= 24:
                 hours -= 24
@@ -22,11 +22,8 @@ def parse_transition(row, col_name, sunrise, sunset, next_day_str, next_row):
             else:
                 dt = datetime.strptime(time, "%H:%M:%S")
             results.append(f"{name} till {dt.strftime('%I:%M:%S %p')} on {next_day_str}")
-        except ValueError:
-            results.append(f"{name} timing unavailable")
-    elif ' ' in value:
-        name, time = value.split(' ')
-        try:
+        elif ' ' in value:
+            name, time = value.split(' ')
             dt = datetime.strptime(time, "%H:%M:%S")
             if dt <= sunrise:
                 next_value = next_row[col_name]
@@ -36,8 +33,10 @@ def parse_transition(row, col_name, sunrise, sunset, next_day_str, next_row):
             else:
                 next_value = next_row[col_name].split(' ')[0] if ' ' in next_row[col_name] else next_row[col_name]
                 results.append(f"{name} from {sunrise.strftime('%I:%M %p')} to {dt.strftime('%I:%M %p')}, {next_value} from {dt.strftime('%I:%M %p')} to {sunset.strftime('%I:%M %p')}")
-        except ValueError:
-            results.append(f"{name} timing format error")
+        else:
+            results.append(f"{value}")
+    except Exception as e:
+        results.append(f"Error parsing {col_name}: {e}")
     return results
 
 # --- Streamlit App ---
@@ -77,7 +76,7 @@ if not check_row.empty and not next_row.empty:
     next_day_str = (pd.to_datetime(selected_date) + timedelta(days=1)).strftime('%m/%d/%Y')
 
     st.markdown(f"### 🗓️ Panchangam Lookup for Selected Date")
-    st.success(f"🗕️ {day}, {selected_date.strftime('%B %d, %Y')}")
+    st.success(f"📅 {day}, {selected_date.strftime('%B %d, %Y')}")
 
     t = parse_transition(check_row, 'Tithi', sunrise, sunset, next_day_str, next_r)
     n = parse_transition(check_row, 'Nakshatra', sunrise, sunset, next_day_str, next_r)
@@ -94,7 +93,7 @@ if not check_row.empty and not next_row.empty:
         issues.append(f"Haircut not allowed on {day}s.")
     if any(x.split()[0] in ["Prathama", "Chaturthi", "Shashti", "Navami", "Chaturdashi", "Poornima", "Amavasya"] for x in t):
         issues.append("Tithi not suitable for haircut.")
-    if not any(x.split()[0] in ["Ashwini", "Mrigashirsha", "Punarvasu", "Pushya", "Hastam", "Chitra", "Swati", "Jyeshtha", "Shravana", "Dhanishta", "Shatabhishak", "Revati"] for x in n):
+    if not any(any(nak in x for nak in ["Ashwini", "Mrigashirsha", "Punarvasu", "Pushya", "Hastam", "Chitra", "Swati", "Jyeshtha", "Shravana", "Dhanishta", "Shatabhishak", "Revati"]) for x in n):
         issues.append("Nakshatra is not allowed.")
     if any(x.split()[0] in ["Vyatheepatham", "Vaidhriti"] for x in y):
         issues.append("Yogam not allowed for haircut.")
@@ -109,7 +108,7 @@ if not check_row.empty and not next_row.empty:
             st.markdown(f"- {issue}")
 
     # Suggest 2 future good dates
-    st.markdown("### 🗖️ Next Good Haircut Dates")
+    st.markdown("### 📆 Next Good Haircut Dates")
     future_dates = df[df['Date'] > pd.to_datetime(selected_date)].copy()
     future_dates = future_dates.reset_index(drop=True)
 
@@ -132,7 +131,7 @@ if not check_row.empty and not next_row.empty:
             reasons.append("bad weekday")
         if any(x.split()[0] in ["Prathama", "Chaturthi", "Shashti", "Navami", "Chaturdashi", "Poornima", "Amavasya"] for x in t):
             reasons.append("bad tithi")
-        if not any(x.split()[0] in ["Ashwini", "Mrigashirsha", "Punarvasu", "Pushya", "Hastam", "Chitra", "Swati", "Jyeshtha", "Shravana", "Dhanishta", "Shatabhishak", "Revati"] for x in n):
+        if not any(any(nak in x for nak in ["Ashwini", "Mrigashirsha", "Punarvasu", "Pushya", "Hastam", "Chitra", "Swati", "Jyeshtha", "Shravana", "Dhanishta", "Shatabhishak", "Revati"]) for x in n):
             reasons.append("bad nakshatra")
         if any(x.split()[0] in ["Vyatheepatham", "Vaidhriti"] for x in y):
             reasons.append("bad yogam")
