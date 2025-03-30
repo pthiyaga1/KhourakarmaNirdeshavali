@@ -2,11 +2,11 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 
-st.set_page_config(page_title="Kshoura Karma Nirdeshavali", layout="centered")
-st.title("💇‍♂️ Kshoura Karma Nirdeshavali - Rev04 - 03/29/25")
-st.subheader("📍 Portland OR")
+# Title & Subtitle
+st.title("🔧 Kshoura Karma Nirdeshavali - Haircut Date Checker")
+st.subheader("📍 Portland, OR")
 
-# === Load Data ===
+# Load data
 @st.cache_data
 def load_data():
     url = "https://raw.githubusercontent.com/pthiyaga1/KshourakarmaNirdeshavali/main/Panchangam_April-June_2025_filled_full.csv"
@@ -16,124 +16,130 @@ def load_data():
 
 df = load_data()
 
-# === Utility function to parse and interpret transition fields ===
-def parse_transition(value_today, value_next):
+# Janma Nakshatra list
+nakshatras_list = [
+    "Ashvini", "Bharani", "Krittika", "Rohini", "Mrigashirsha", "Aardra", "Punarvasu", "Pushya", "Aslesha", "Magha",
+    "P. Phalguni or Purva", "U. Phalguni or Uttara", "Hasta", "Chitra", "Svaati", "Vishaakha", "Anuraadha", "Jyeshtha",
+    "Mula", "P.shadha", "U.shada", "Shravana", "Dhanishta", "Shatabhisha", "P. Bhadrapada", "U. Bhadrapada", "Revati"
+]
+
+# User inputs
+selected_date = st.date_input("Select the date you're considering for haircut", min_value=df['Date'].min(), max_value=df['Date'].max())
+janma_nakshatra = st.selectbox("Select your Janma Nakshatra", nakshatras_list)
+
+# Helper function to parse tithi/nakshatra/yogam with time
+
+def parse_transition(data_str, fallback_str):
+    if pd.isna(data_str):
+        return fallback_str
+    if "full night" in data_str:
+        return data_str
+    if ' ' not in data_str:
+        return data_str
     try:
-        if pd.isna(value_today):
-            return "N/A"
-
-        if "full night" in value_today:
-            return value_today
-
-        if ' ' in value_today:
-            name, time = value_today.split(' ')
-            time_cleaned = time.replace("+", "").strip()
-            dt = datetime.strptime(time_cleaned, "%H:%M:%S")
-            return name, dt
+        name, time = data_str.split(' ')
+        hour, minute, second = map(int, time.split(":"))
+        if hour >= 24:
+            dt = datetime.combine(datetime.today(), datetime.min.time()) + timedelta(days=1, hours=hour-24, minutes=minute, seconds=second)
         else:
-            return value_today, None
+            dt = datetime.combine(datetime.today(), datetime.min.time()) + timedelta(hours=hour, minutes=minute, seconds=second)
+        return (name, dt.time())
     except:
-        return "N/A", None
+        return fallback_str
 
-# === Section 1: Show haircut dates based on birth star ===
-st.header("🔍 Get Haircut/Shaving Allowed Dates")
+# Function to check haircut rules
+def is_good_haircut_day(row, janma_nakshatra):
+    reasons = []
+    good = True
 
-nakshatra_list = [
-    "Ashvini", "Bharani", "Krittika", "Rohini", "Mrigashirsha", "Aardra", "Punarvasu", "Pushya",
-    "Aslesha", "Magha", "P. Phalguni or Purva", "U. Phalguni or Uttara", "Hasta", "Chitra", "Svaati",
-    "Vishaakha", "Anuraadha", "Jyeshtha", "Mula", "P.shadha", "U.shada", "Shravana", "Dhanishta",
-    "Shatabhisha", "P. Bhadrapada", "U. Bhadrapada", "Revati"
-]
+    # Weekday check
+    weekday = row['Day']
+    if weekday in ["Sunday", "Tuesday", "Saturday"]:
+        good = False
+        reasons.append(f"Avoid haircut on {weekday}s")
 
-user_nakshatra = st.selectbox("Select your Janma Nakshatra:", nakshatra_list)
+    # Tithi check
+    banned_tithis = ["Prathama", "Chaturthi", "Shashti", "Navami", "Chaturdashi", "Poornima", "Amavasya"]
+    tithi = str(row['Tithi']).split(" ")[0]
+    if tithi in banned_tithis:
+        good = False
+        reasons.append(f"Tithi '{tithi}' is not allowed for haircut")
 
-now = datetime.now()
-st.write(f"🕒 Current time: {now.strftime('%A, %B %d, %Y %I:%M:%S %p')}")
+    # Nakshatra check
+    allowed_nakshatras = ["Ashwini", "Mrigasheersham", "Punarvasu", "Pushyam", "Hastam", "Chitra", "Swati", "Jyestha", "Shravana", "Dhanishta", "Shatabhishak", "Revati"]
+    nak = str(row['Nakshatra']).split(" ")[0]
+    if nak not in allowed_nakshatras:
+        good = False
+        reasons.append(f"Nakshatra '{nak}' is not among allowed nakshatras")
 
-# Haircut rules (simplified logic for demo)
-allowed_days = ["Monday", "Wednesday", "Friday", "Thursday"]
-avoid_nakshatras = [
-    "Ashvini", "Mrigasheersham", "Punarvasu", "Pushyam", "Hastam", "Chitra", "Swati", "Jyeshta",
-    "Shravana", "Dhanishta", "Shatabhishak", "Revati"
-]
-avoid_tithis = ["Prathama", "Chaturthi", "Shashti", "Navami", "Chaturdashi", "Poornima", "Amavasya"]
-avoid_yogas = ["Vyatheetapa", "Vaidhriti"]
+    # Janma nakshatra match check
+    if janma_nakshatra in str(row['Nakshatra']):
+        good = False
+        reasons.append(f"Avoid haircut on your Janma Nakshatra: {janma_nakshatra}")
 
-future_dates = []
-for i in range(1, 30):
-    date = now.date() + timedelta(days=i)
-    row = df[df['Date'] == pd.to_datetime(date)]
-    if not row.empty:
-        day = row.iloc[0]['Day']
-        tithi = str(row.iloc[0]['Tithi']).split(' ')[0]
-        nakshatra = str(row.iloc[0]['Nakshatra']).split(' ')[0]
-        yoga = str(row.iloc[0]['Yogam']).split(' ')[0]
+    # Yogam check
+    banned_yogas = ["Vyatipata", "Vaidhriti"]
+    yoga = str(row['Yogam']).split(" ")[0]
+    if yoga in banned_yogas:
+        good = False
+        reasons.append(f"Yogam '{yoga}' is not allowed")
 
-        if day in allowed_days and tithi not in avoid_tithis and yoga not in avoid_yogas and user_nakshatra not in nakshatra:
-            future_dates.append((date.strftime('%A, %B %d, %Y'), day, tithi, nakshatra, yoga))
+    return good, reasons
 
-if future_dates:
-    st.markdown("### ✅ Next 2 Allowed Haircut/Shaving Dates:")
-    for item in future_dates[:2]:
-        st.markdown(f"- **{item[0]}** ({item[1]}): Tithi - {item[2]}, Nakshatra - {item[3]}, Yogam - {item[4]}")
-else:
-    st.warning("No suitable haircut/shaving days found in the next 30 days.")
+# Display Panchangam for selected date
+st.markdown("### 🗌 Panchangam Lookup for Selected Date")
+today_row = df[df['Date'] == pd.to_datetime(selected_date)]
+next_day_row = df[df['Date'] == pd.to_datetime(selected_date) + timedelta(days=1)]
 
-# === Section 2: Panchangam for selected date ===
-st.header("📆 Panchangam Lookup for a Selected Date")
-selected_date = st.date_input("Pick a date", min_value=df['Date'].min(), max_value=df['Date'].max())
+if not today_row.empty and not next_day_row.empty:
+    today = today_row.iloc[0]
+    next_day = next_day_row.iloc[0]
+    sunrise = datetime.strptime(today['Sunrise'], "%H:%M:%S").time()
+    sunset = datetime.strptime(today['Sunset'], "%H:%M:%S").time()
 
-# Get today's and next day's data
-selected_day = df[df['Date'] == pd.to_datetime(selected_date)]
-next_day = df[df['Date'] == pd.to_datetime(selected_date) + timedelta(days=1)]
+    tithi_data = parse_transition(today['Tithi'], next_day['Tithi'])
+    nakshatra_data = parse_transition(today['Nakshatra'], next_day['Nakshatra'])
+    yogam_data = parse_transition(today['Yogam'], next_day['Yogam'])
 
-if not selected_day.empty and not next_day.empty:
-    day = selected_day.iloc[0]['Day']
-    sunrise = datetime.strptime(selected_day.iloc[0]['Sunrise'], "%H:%M:%S")
-    sunset = datetime.strptime(selected_day.iloc[0]['Sunset'], "%H:%M:%S")
-    st.success(f"📅 {day}, {selected_date.strftime('%B %d, %Y')}")
-
-    # Tithi
-    tname1, tdt = parse_transition(selected_day.iloc[0]['Tithi'], next_day.iloc[0]['Tithi'])
-    tname2 = str(next_day.iloc[0]['Tithi']).split(' ')[0]
-    if tdt is None:
-        tithi_str = tname1
-    elif tdt <= sunrise:
-        tithi_str = f"{tname2} from {sunrise.strftime('%I:%M %p')} to {sunset.strftime('%I:%M %p')}"
-    elif tdt > sunset:
-        tithi_str = f"{tname1} from {sunrise.strftime('%I:%M %p')} to {sunset.strftime('%I:%M %p')}"
+    if isinstance(tithi_data, tuple):
+        tithi_str = f"{tithi_data[0]} till {tithi_data[1].strftime('%I:%M %p')}"
     else:
-        tithi_str = f"{tname1} from {sunrise.strftime('%I:%M %p')} to {tdt.strftime('%I:%M %p')}, {tname2} from {tdt.strftime('%I:%M %p')} to {sunset.strftime('%I:%M %p')}"
-    st.markdown(f"<b style='color:#0066cc'>🔷 Tithis b/w Sunrise & Sunset:</b> {tithi_str}", unsafe_allow_html=True)
+        tithi_str = tithi_data
 
-    # Nakshatra
-    nname1, ndt = parse_transition(selected_day.iloc[0]['Nakshatra'], next_day.iloc[0]['Nakshatra'])
-    nname2 = str(next_day.iloc[0]['Nakshatra']).split(' ')[0]
-    if ndt is None:
-        nak_str = nname1
-    elif ndt <= sunrise:
-        nak_str = f"{nname2} from {sunrise.strftime('%I:%M %p')} to {sunset.strftime('%I:%M %p')}"
-    elif ndt > sunset:
-        nak_str = f"{nname1} from {sunrise.strftime('%I:%M %p')} to {sunset.strftime('%I:%M %p')}"
+    if isinstance(nakshatra_data, tuple):
+        nakshatra_str = f"{nakshatra_data[0]} till {nakshatra_data[1].strftime('%I:%M %p')}"
     else:
-        nak_str = f"{nname1} from {sunrise.strftime('%I:%M %p')} to {ndt.strftime('%I:%M %p')}, {nname2} after {ndt.strftime('%I:%M %p')}"
-    st.markdown(f"<b style='color:#ffaa00'>🌟 Nakshatras b/w Sunrise & Sunset:</b> {nak_str}", unsafe_allow_html=True)
+        nakshatra_str = nakshatra_data
 
-    # Yogam
-    yname1, ydt = parse_transition(selected_day.iloc[0]['Yogam'], next_day.iloc[0]['Yogam'])
-    yname2 = str(next_day.iloc[0]['Yogam']).split(' ')[0]
-    if ydt is None:
-        yogam_str = yname1
-    elif ydt <= sunrise:
-        yogam_str = f"{yname2} from {sunrise.strftime('%I:%M %p')} to {sunset.strftime('%I:%M %p')}"
-    elif ydt > sunset:
-        yogam_str = f"{yname1} from {sunrise.strftime('%I:%M %p')} to {sunset.strftime('%I:%M %p')}"
+    if isinstance(yogam_data, tuple):
+        yogam_str = f"{yogam_data[0]} till {yogam_data[1].strftime('%I:%M %p')}"
     else:
-        yogam_str = f"{yname1} from {sunrise.strftime('%I:%M %p')} to {ydt.strftime('%I:%M %p')}, {yname2} after {ydt.strftime('%I:%M %p')}"
-    st.markdown(f"<b style='color:#228B22'>🧘 Yogam b/w Sunrise & Sunset:</b> {yogam_str}", unsafe_allow_html=True)
+        yogam_str = yogam_data
 
-    # Guidance Image
-    st.image("https://raw.githubusercontent.com/pthiyaga1/KshourakarmaNirdeshavali/main/image.png", use_container_width=True)
+    st.write(f"\n\n\U0001f4c6 **{today['Day']}, {selected_date.strftime('%B %d, %Y')}**")
+    st.markdown(f"<b style='color:#0066cc'>\U0001f537 Tithi:</b> {tithi_str}", unsafe_allow_html=True)
+    st.markdown(f"<b style='color:#ffaa00'>\U0001f31f Nakshatra:</b> {nakshatra_str}", unsafe_allow_html=True)
+    st.markdown(f"<b style='color:#228B22'>\U0001f9d8 Yogam:</b> {yogam_str}", unsafe_allow_html=True)
 
-else:
-    st.warning("Date not available in data.")
+    good, reasons = is_good_haircut_day(today, janma_nakshatra)
+    if good:
+        st.success("\n\n✅ You can proceed with haircut on this date.")
+    else:
+        st.error("\n\n❌ Not a good day for haircut due to following reasons:")
+        for r in reasons:
+            st.markdown(f"- {r}")
+
+        # Suggest next 2 good days
+        st.info("\n\n✉ Suggesting next 2 good days:")
+        future = df[df['Date'] > pd.to_datetime(selected_date)]
+        found = 0
+        for _, row in future.iterrows():
+            ok, _ = is_good_haircut_day(row, janma_nakshatra)
+            if ok:
+                st.markdown(f"- **{row['Day']}, {row['Date'].strftime('%B %d, %Y')}**")
+                found += 1
+            if found == 2:
+                break
+
+# Show guidance image
+st.image("https://raw.githubusercontent.com/pthiyaga1/KshourakarmaNirdeshavali/main/image.png", use_container_width=True)
