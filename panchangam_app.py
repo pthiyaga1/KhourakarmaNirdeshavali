@@ -13,10 +13,14 @@ def parse_transition(row, col_name, sunrise, sunset, next_day_str, next_row):
         results.append(f"{value}")
     elif '+' in value:
         name, time = value.split(' ')
+        time = time.replace('+', '')  # remove plus sign
         try:
             hours, minutes, seconds = map(int, time.split(':'))
-            hours -= 24
-            dt = datetime.strptime(f"{hours}:{minutes}:{seconds}", "%H:%M:%S") + timedelta(days=1)
+            if hours >= 24:
+                hours -= 24
+                dt = datetime.strptime(f"{hours}:{minutes}:{seconds}", "%H:%M:%S") + timedelta(days=1)
+            else:
+                dt = datetime.strptime(time, "%H:%M:%S")
             results.append(f"{name} till {dt.strftime('%I:%M:%S %p')} on {next_day_str}")
         except ValueError:
             results.append(f"{name} timing unavailable")
@@ -38,7 +42,7 @@ def parse_transition(row, col_name, sunrise, sunset, next_day_str, next_row):
 
 # --- Streamlit App ---
 st.set_page_config(page_title="Kshoura Karma Panchangam Tool", layout="centered")
-st.title("✂️ Kshoura Karma Nirdeshavali - Haircut Date Checker")
+st.title("✂️ Kshoura Karma Nirdeshavali - Haircut Date Checker - Rev08")
 
 # Load Data
 @st.cache_data
@@ -83,7 +87,7 @@ if not check_row.empty and not next_row.empty:
     st.markdown(f"<b style='color:#ffaa00'>🌟 Nakshatra:</b> {'; '.join(n)}", unsafe_allow_html=True)
     st.markdown(f"<b style='color:#228B22'>🧘 Yogam:</b> {'; '.join(y)}", unsafe_allow_html=True)
 
-    # Now use logic to decide haircut possibility:
+    # --- Haircut Check Logic ---
     issues = []
 
     if day in ["Sunday", "Tuesday", "Saturday"]:
