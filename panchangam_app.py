@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 # Title & Subtitle
-st.title("🔧 Kshoura Karma Nirdeshavali - Haircut Date Checker")
+st.title("🔧 Kshoura Karma Nirdeshavali - Haircut Date Checker - Rev07")
 st.subheader("📍 Portland, OR")
 
 # Load data
